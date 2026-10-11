@@ -527,11 +527,20 @@ const CAUTION = "Not medical advice. The book designed this layout for experienc
 const ESO_NOTE = "Esoteric layouts can contradict the story you tell yourself. Only ask if you’re ready to look honestly at what comes up.";
 /* positions: [x, y, name, description, difficult?] using centre points from the book’s diagrams */
 const LAYOUTS = [
-  {id:"single", group:"Quick", name:"Single card", yn:1, maxCard:200,
+  {id:"single", group:"Quick", name:"Single card", yn:1, maxCard:200, plain:true,
    blurb:"One card for a quick focus, or a card of the day.",
    purpose:"One card, read through your question, or as the main theme around you right now if you leave the question blank. It isn’t one of the book’s layouts, and the book recommends fuller layouts for any question that really matters.",
    W:138, H:222, cw:138, ch:222,
    pos:[[69,111,"The card","What this card is saying to you now, read through your question."]]},
+  {id:"three", group:"Quick", name:"Three cards", maxCard:170, plain:true,
+   blurb:"Past, present and future in three cards.",
+   purpose:"Three cards in a row: the past that shaped things, where you stand now, and where it’s heading. It isn’t one of the book’s layouts, and the book recommends fuller layouts for any question that really matters.",
+   W:478, H:222, cw:138, ch:222,
+   pos:[
+    [69,111,"Past","What has shaped the situation."],
+    [239,111,"Present","Where things stand now."],
+    [409,111,"Future","Where things are heading if nothing changes."]
+   ]},
   {id:"yesno", group:"Everyday", name:"Simple yes/no", yn:6,
    blurb:"One focused question, one clear answer.",
    purpose:"A straight answer to one focused question. Card 6 is the answer; the other five show how it comes about.",
@@ -930,6 +939,8 @@ const modal = {
 
 /* ===== card detail ===== */
 function suitLine(k){ const S = SUITS[k]; return S.element + ", the " + S.dir + ". " + S.theme.charAt(0).toUpperCase() + S.theme.slice(1) + "." + (S.alt ? " The book calls them " + S.alt + "." : ""); }
+const YNISH = /yes\/no|\byes\b|as an answer/i;
+function plainText(t){ return (String(t).match(/[^.!?]+[.!?]*\s*/g) || [String(t)]).filter(x => !YNISH.test(x)).join("").trim(); }
 function cardBlock(c, o){
   o = o || {};
   const info = el("div", {class:"cd-info"});
@@ -941,7 +952,7 @@ function cardBlock(c, o){
       el("p", {class:"fine"}, "This is a difficult position: the card’s gifts are held back, or its trouble is what you face.")));
     info.append(el("p", null, el("b", null, "Its usual meaning: "), c.mean));
   } else {
-    info.append(el("p", null, c.mean));
+    info.append(el("p", null, o.plain ? plainText(c.mean) : c.mean));
     if (o.showShadow) info.append(el("p", {class:"fine"}, el("b", null, "In a difficult position: "), c.shadow));
   }
   if (o.showYN) info.append(el("p", {class:"fine"}, el("b", null, "As a yes/no answer: "), ynLean(c)));
@@ -949,7 +960,7 @@ function cardBlock(c, o){
   else info.append(
     el("p", {class:"fine"}, el("b", null, SUITS[c.suit].name + ": "), suitLine(c.suit)),
     el("p", {class:"fine"}, el("b", null, c.rank >= 10 ? "Court card: " : "The number: "), RANK_NOTES[c.rank]));
-  if (c.note) info.append(el("p", {class:"cd-note"}, c.note));
+  if (c.note && !(o.plain && YNISH.test(c.note))) info.append(el("p", {class:"cd-note"}, c.note));
   return el("div", {class:"cd"}, el("img", {class:"cd-img", src:IMG[c.id] || "", alt:c.name}), info);
 }
 function openPosition(L, o, i){
@@ -968,7 +979,7 @@ function openReadingCard(R, i, focusWhich){
     el("h2", {class:"rc-pos"}, p[2]),
     el("p", {class:"rc-desc"}, p[3]));
   if (d.major) box.append(cardBlock(BYID[d.card], {role:"shows", neg}), cardBlock(BYID[d.major], {role:"power", neg}));
-  else box.append(cardBlock(BYID[d.card], {neg, showYN: R.ansIndex === i}));
+  else box.append(cardBlock(BYID[d.card], {neg, showYN: R.ansIndex === i, plain: R.plain}));
   const prev = el("button", {class:"btn small", type:"button", disabled:i === 0}, "Previous card");
   const next = el("button", {class:"btn small", type:"button", disabled:i === n - 1}, "Next card");
   prev.addEventListener("click", () => openReadingCard(R, i - 1, "prev"));
@@ -1191,7 +1202,7 @@ function impressionLines(R){
     let t;
     if (k === 0) t = "No trumps among the " + n + " cards: this is about everyday ups and downs rather than a big turn of fate.";
     else if (r < 0.25) t = k + (k > 1 ? " trumps" : " trump") + " among " + n + " cards: mostly everyday matters, with " + listNames(trumps) + " marking what matters most.";
-    else if (r < 0.5) t = k + " trumps among " + n + " cards: a strong thread of fate runs through this, led by " + listNames(trumps) + ".";
+    else if (r < 0.5) t = k + (k > 1 ? " trumps" : " trump") + " among " + n + " cards: a strong thread of fate runs through this, led by " + listNames(trumps) + ".";
     else t = k + " trumps among " + n + " cards: big forces are at work, so this is a heavily fated picture.";
     p.append(el("p", null, t));
   }
@@ -1288,7 +1299,7 @@ function readingList(R, ann){
       d.major ? el("span", {class:"li-x"}, "Power behind it: " + BYID[d.major].name) : null,
       neg ? el("span", {class:"li-neg"}, "Difficult position, read for its shadow") : null,
       a.tone ? el("span", {class:"li-tone t-" + a.tone}, TONE[a.tone].mark + " " + TONE[a.tone].label) : null,
-      el("span", {class:"li-m"}, neg ? c.shadow : c.mean));
+      el("span", {class:"li-m"}, neg ? c.shadow : (R.plain ? plainText(c.mean) : c.mean)));
     const b = el("button", {class:"row" + (a.dim ? " dim" : ""), type:"button"},
       el("span", {class:"li-n", "aria-hidden":"true"}, String(i + 1)), t, el("img", {src:IMG[c.id] || "", alt:"", loading:"lazy"}));
     b.addEventListener("click", () => openReadingCard(R, i));
@@ -1448,7 +1459,7 @@ function onReadDeal(decks, msg){
   if (L.finder) sub = "Searching " + (readState.area.length ? readState.area.join(", then ") : "the whole area") + (readState.areaText.trim() ? ", " + readState.areaText.trim() : "");
   else if (L.timing) sub = UNITS[o.unit][1] + ", starting " + o.base.toLocaleDateString(undefined, {day:"numeric", month:"long"});
   else if (split) sub = "Split deck";
-  const R = {layout:L, opts:o, draw, split, question, sub, qLabel:"A general reading"};
+  const R = {layout:L, opts:o, draw, split, question, sub, qLabel:"A general reading", plain:!!L.plain};
   const key = L.id + "|" + question.toLowerCase();
   if (msg && question && key === readState.lastKey && !L.finder) msg.textContent += " Same question again? If you’re re-dealing for a different answer, narrow the question or change the timeframe instead.";
   readState.lastKey = key;
@@ -1482,7 +1493,7 @@ function chooseLayout(id, fromPicker){
 }
 function openPicker(){
   const box = el("div", null, el("h2", {class:"pk-h"}, "Choose a layout"));
-  [["Quick", "Quick draw", "Not one of the book’s layouts: a single card for a quick focus, or a card of the day."], ["Everyday", "Everyday layouts", ""], ["Esoteric", "Esoteric layouts", "For magicians and mystics: fate, inner contacts and the soul’s path."]].forEach(grp => {
+  [["Quick", "Quick draw", "Not from the book: quick one- and three-card readings that describe what the cards show, with no yes or no."], ["Everyday", "Everyday layouts", ""], ["Esoteric", "Esoteric layouts", "For magicians and mystics: fate, inner contacts and the soul’s path."]].forEach(grp => {
     box.append(el("h3", {class:"pk-g"}, grp[1]));
     if (grp[2]) box.append(el("p", {class:"pk-note"}, grp[2]));
     const grid = el("div", {class:"ltiles"});
@@ -1649,6 +1660,7 @@ const AI_RULES = [
 ].join("\n");
 
 const LAYOUT_NOTES = {
+  three: "Three cards in sequence: card 1 is the past that shaped the situation, card 2 where things stand now, and card 3 where they are heading if nothing changes. Read them as one flowing story, showing how each card leads into the next.",
   single: "A single card. Read it through the question, or, if no question was typed, as the main theme around the person right now. Explain what it says, why that meaning fits, and what its Rider–Waite–Smith imagery adds. One card gives a focus, not the whole picture, so don’t stretch it into a detailed prediction.",
   yesno: "Card 6 is the answer and sits over card 1, what the question is really about. Cards 2 (relevant past) and 5 (where it leads) are the poles of past and future: read them together for how the future grows out of the past. Cards 3 (difficulties) and 4 (help) are the two legs the reading stands on: weigh the difficulty against the help. Card 4 also shows what was gained from the past in card 2, and both shape card 5.",
   tree: "The layout follows the Kabbalistic Tree of Life. Card 1 at the crown is what the story is about. The right-hand column (2, 4, 7) holds the giving, expanding forces and the left-hand column (3, 5, 8) the hidden, restricting ones; read them as pairs across the tree (2 with 3, 4 with 5, 7 with 8). The middle column carries the story down: 6 is the pivot, 9 the reason or dynamic underneath, and 10 the outcome where everything lands.",
@@ -1669,6 +1681,7 @@ const LAYOUT_NOTES = {
 
 const YN_RULE = "This is a yes/no reading. The verdict given below was decided by the book’s rule and is final: the answer card is read against the question, so a favourable card confirms something hoped for and a difficult card confirms something feared; a standstill card means nothing moves within the timeframe, and the Wheel of Fortune means change comes. State the verdict first, exactly as given, and never contradict it or soften it into a different answer. Then explain how the cards show the way it comes about.";
 
+const PLAIN_RULE = "This is not a yes/no reading. Don’t frame anything as a yes or a no, and don’t sort the cards into good and bad; explain what each card shows and how it applies to the person.";
 const AI_FOLLOW = "The person has a follow-up question about this same reading. Answer it using only the cards above, the same method, and the same verdict if there is one. Plain English, short paragraphs, no headings, under 250 words unless they ask for more.\n\nTheir question: ";
 
 const AI_HIDE = ["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed"];
@@ -1709,9 +1722,9 @@ function md(text){
 }
 
 /* ----- building the prompt ----- */
-function cardLine(label, c, neg){
+function cardLine(label, c, neg, plain){
   const kind = c.major ? "trump " + roman(c.num) : SUITS[c.suit].name + ", " + SUITS[c.suit].element.toLowerCase() + (c.rank >= 10 ? ", court card" : "");
-  return "   " + label + ": " + c.name + " (" + kind + "; usual leaning " + TONE[c.cat].label + ", " + STRENGTH[c.w] + "). Keywords: " + c.kw + ". Meaning: " + c.mean + (neg ? " Shadow: " + c.shadow : "") + (c.note ? " Note: " + c.note : "");
+  return "   " + label + ": " + c.name + " (" + kind + (plain ? "" : "; usual leaning " + TONE[c.cat].label + ", " + STRENGTH[c.w]) + "). Keywords: " + c.kw + ". Meaning: " + (plain ? plainText(c.mean) : c.mean) + (neg ? " Shadow: " + c.shadow : "") + (c.note && !(plain && YNISH.test(c.note)) ? " Note: " + c.note : "");
 }
 function verdictLine(R){
   const c = BYID[R.draw[R.ansIndex].card], V = ynVerdict(c, R.framing);
@@ -1758,6 +1771,7 @@ function aiPrompt(R, ctx){
   const words = seek ? 480 : Math.min(1300, 260 + 65 * P.length);
   const lines = [AI_RULES, "", "Layout notes: " + (LAYOUT_NOTES[L.id] || "") + (R.split ? LAYOUT_NOTES.overviewSplit : "")];
   if (yn) lines.push("", YN_RULE);
+  if (R.plain) lines.push("", PLAIN_RULE);
   lines.push("", "THE READING");
   lines.push("Layout: " + L.name + ", " + countText(L, R.opts, R.split) + ". " + L.purpose);
   lines.push(R.question ? "Question: “" + R.question + "”" : yn ? "Question: the person kept their yes/no question in mind instead of typing it. Don’t guess what it was; explain the answer and what each card says through its position, in words that fit whatever they asked." : "Question: none was typed, so give a general reading of the person’s situation right now, through what each position covers.");
@@ -1770,7 +1784,7 @@ function aiPrompt(R, ctx){
     if (d.major){
       lines.push(cardLine("Trump, the power behind it", BYID[d.major], neg));
       lines.push(cardLine("Minor card, how it shows up", BYID[d.card], neg));
-    } else lines.push(cardLine("Card", BYID[d.card], neg));
+    } else lines.push(cardLine("Card", BYID[d.card], neg, R.plain));
   });
   lines.push("", "First impressions worked out by the app: " + impressionLines(R).join(" "));
   if (yn) lines.push("", verdictLine(R));
@@ -1867,7 +1881,7 @@ function aiSection(R, ctx){
       sec._ctl = null;
     }
   }
-  ["What should I do next?", "Which card matters most, and why?", "Explain the difficult cards more"].forEach(t => {
+  (!R.plain ? ["What should I do next?", "Which card matters most, and why?", "Explain the difficult cards more"] : R.draw.length === 1 ? ["What should I do next?", "Tell me more about the imagery", "How does this apply to my life right now?"] : ["What should I do next?", "How do the three cards connect?", "Tell me more about the imagery"]).forEach(t => {
     const b = el("button", {class:"chip", type:"button"}, t);
     b.addEventListener("click", () => followUp(t));
     chips.append(b);
